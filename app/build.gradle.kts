@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.firebase.database.ktx)
+    implementation(libs.androidx.lifecycle.process)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -82,6 +84,8 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore:25.1.1")
     implementation("com.google.firebase:firebase-analytics:22.1.2")
     implementation("com.google.android.gms:play-services-auth:21.3.0")
+
+    implementation ("com.github.bumptech.glide:glide:4.16.0")
 
 
 

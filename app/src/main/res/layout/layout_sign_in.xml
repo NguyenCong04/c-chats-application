@@ -231,12 +231,13 @@
 
 
             <Button
+                android:id="@+id/btnSigUp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="30dp"
                 android:background="@drawable/custom_bottom_bg_blue"
                 android:fontFamily="@font/gilroy_medium"
-                android:text="Login"
+                android:text="Sign Up"
                 android:textColor="@color/white"
                 android:textStyle="bold" />
 

@@ -2,4 +2,15 @@
 <resources>
 
     <style name="Theme.Cchatsapplication" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="BottomNavTextActive">
+        <item name="android:fontFamily">@font/gilroy_medium</item> <!-- Font chữ tùy chỉnh -->
+        <item name="android:textSize">14sp</item> <!-- Kích thước chữ -->
+    </style>
+    <style name="BottomNavTextInactive">
+        <item name="android:fontFamily">@font/gilroy_regular</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item> <!-- Kiểu chữ -->
+    </style>
+
 </resources>
