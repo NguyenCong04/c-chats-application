@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment
 import com.bumptech.glide.Glide
 import com.example.c_chats_application.R
 import com.example.c_chats_application.compose.DialogCompose
+import com.example.c_chats_application.config.COMMON
 import com.example.c_chats_application.databinding.FragmentLayoutSettingBinding
 import com.example.c_chats_application.screen.LoginActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -38,7 +39,7 @@ class SettingFragment : Fragment() {
                 requireContext(),
                 onConfirm = {
                     db.collection("user").document(auth.currentUser?.uid.toString()).update(
-                        "status", "offline",
+                        "status", COMMON.statusOffline,
                         "lastSeen", FieldValue.serverTimestamp()
                     ).addOnSuccessListener {
                         auth.signOut()
@@ -67,11 +68,13 @@ class SettingFragment : Fragment() {
                 val name = it.getString("name").toString()
                 val image = it.getString("image").toString()
                 binding.tvNameUser.text = name
-                Glide.with(requireContext())
-                    .load(image)
-                    .placeholder(R.drawable.icon_avata_default)
-                    .circleCrop()
-                    .into(binding.ivAvatar)
+                if (isAdded && activity != null && !requireActivity().isDestroyed) {
+                    Glide.with(requireContext())
+                        .load(image)
+                        .placeholder(R.drawable.icon_avata_default)
+                        .circleCrop()
+                        .into(binding.ivAvatar)
+                }
             }
             .addOnFailureListener {
                 Log.e(TAG, "setUpUi: $it -- ${it.message}")

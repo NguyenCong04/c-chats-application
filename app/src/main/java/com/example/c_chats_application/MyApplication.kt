@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.example.c_chats_application.config.COMMON
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -33,12 +34,12 @@ class MyApplication : Application(), DefaultLifecycleObserver {
         if (isOnline) {
 
             userStatusRef.update(
-                "status", "online"
+                "status", COMMON.statusOnline
             )
                 .addOnFailureListener { Log.e("StatusUpdate", "Failed to update status") }
         } else {
             userStatusRef.update(
-                "status", "offline",
+                "status", COMMON.statusOffline,
                 "lastSeen", FieldValue.serverTimestamp()
             )
                 .addOnFailureListener { Log.e("StatusUpdate", "Failed to update status") }

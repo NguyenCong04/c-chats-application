@@ -7,6 +7,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"
         android:orientation="vertical">
 
         <TextView
@@ -23,6 +24,52 @@
             android:layout_height="0.5dp"
             android:background="#F2F2F2"
             android:layout_marginBottom="10dp"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:padding="10dp">
+
+        <EditText
+            android:id="@+id/edSearch"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="1"
+            android:background="@drawable/custom_button_cancel"
+            android:drawableStart="@drawable/icon_search"
+            android:drawablePadding="15dp"
+            android:fontFamily="@font/gilroy_medium"
+            android:hint="Search...."
+            android:padding="13dp"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnSeach"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.3"
+            android:background="@drawable/custom_bottom_bg_blue"
+            android:fontFamily="@font/gilroy_medium"
+            android:text="Search"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rcvListUser"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            />
 
     </LinearLayout>
 

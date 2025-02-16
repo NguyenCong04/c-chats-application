@@ -23,6 +23,10 @@
             android:exported="true"
             android:windowSoftInputMode="stateHidden|adjustPan" />
         <activity
+            android:name=".screen.MessageActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".screen.SignInActivity"
             android:exported="true"
             android:windowSoftInputMode="stateHidden|adjustPan" />
