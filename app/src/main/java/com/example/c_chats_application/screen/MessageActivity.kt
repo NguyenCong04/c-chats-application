@@ -5,19 +5,28 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.c_chats_application.R
+import com.example.c_chats_application.adapter.MessageAdapter
 import com.example.c_chats_application.config.COMMON
 import com.example.c_chats_application.databinding.LayoutTextingMessageBinding
+import com.example.c_chats_application.model.ChatModel
+import com.example.c_chats_application.model.MessageModel
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 
 class MessageActivity : AppCompatActivity() {
 
     private val TAG = "ZZMessageActivityZZ"
     private lateinit var binding: LayoutTextingMessageBinding
     private val db = FirebaseFirestore.getInstance()
+    private val chatsCollection = db.collection("chats")
+    private val auth = FirebaseAuth.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,9 +41,36 @@ class MessageActivity : AppCompatActivity() {
 
         //get Intent
         val idUserStatus = intent.getStringExtra("idUserStatus") ?: ""
+        val idUserCurrent = auth.currentUser?.uid ?: ""
 
         uiHiShowMicAndImage()
         fetchUser(idUserStatus)
+
+        binding.layoutBtnSend.setOnClickListener {
+            val text = binding.edtSoanNhanTin.text.toString().trim()
+            sendTextMessage(idUserCurrent, idUserStatus, text) {
+                if (it) {
+                    Log.e(TAG, "onCreate: send successfully $idUserStatus")
+                    binding.edtSoanNhanTin.text.clear()
+                } else {
+                    Log.e(TAG, "onCreate: send failed $idUserStatus")
+                    binding.edtSoanNhanTin.text.clear()
+                }
+            }
+        }
+        getChatIdForOneToOneChat(idUserCurrent, idUserStatus) { chatId ->
+            if (chatId != null) {
+                fetchMessages(chatId) { messages ->
+                    val adapter = MessageAdapter(messages, idUserCurrent)
+                    binding.rcvChat.layoutManager = LinearLayoutManager(this).apply {
+                        stackFromEnd = true // Tự động cuộn xuống cuối danh sách
+                    }
+                    binding.rcvChat.adapter = adapter
+                }
+            } else {
+                Log.d("Chat", "Chưa có cuộc trò chuyện giữa hai người này.")
+            }
+        }
 
         setContentView(binding.root)
     }
@@ -66,6 +102,105 @@ class MessageActivity : AppCompatActivity() {
         }
 
     }
+    private fun sendTextMessage(
+        senderId: String,
+        receiverId: String,
+        messageText: String,
+        callback: (Boolean) -> Unit
+    ) {
+        val chatParticipants =
+            listOf(senderId, receiverId).sorted() // Đảm bảo ID luôn có thứ tự cố định
+        val chatQuery = chatsCollection.whereEqualTo("participants", chatParticipants)
+
+        chatQuery.get().addOnSuccessListener { querySnapshot ->
+            val chatId = if (querySnapshot.isEmpty) {
+                // Nếu chưa có cuộc trò chuyện, tạo chat mới
+                val newChatId = chatsCollection.document().id
+                val newChat = ChatModel(
+                    chatId = newChatId,
+                    lastMessage = messageText,
+                    lastMessageTimestamp = System.currentTimeMillis(),
+                    unreadMessages = mapOf(receiverId to 1), // Người nhận có 1 tin chưa đọc
+                    participants = chatParticipants,
+                    isGroup = false
+                )
+                chatsCollection.document(newChatId).set(newChat)
+                newChatId
+            } else {
+                querySnapshot.documents[0].id
+            }
+
+            // Gửi tin nhắn
+            val messageId = chatsCollection.document().id
+            val message = MessageModel(
+                messageId = messageId,
+                senderId = senderId,
+                text = messageText,
+                messageType = "text",
+                timestamp = System.currentTimeMillis(),
+                readStatus = mapOf(
+                    senderId to true,
+                    receiverId to false
+                ) // Người gửi đã đọc, người nhận chưa
+            )
+
+            chatsCollection.document(chatId).collection("messages").document(messageId)
+                .set(message)
+                .addOnSuccessListener {
+                    // Cập nhật thông tin cuộc trò chuyện
+                    chatsCollection.document(chatId).update(
+                        mapOf(
+                            "lastMessage" to messageText,
+                            "lastMessageTimestamp" to System.currentTimeMillis(),
+                            "unreadMessages.$receiverId" to (querySnapshot.documents.firstOrNull()
+                                ?.get("unreadMessages.$receiverId") as? Int ?: 0) + 1
+                        )
+                    )
+                    callback(true)
+                }
+                .addOnFailureListener {
+                    callback(false)
+                }
+        }.addOnFailureListener {
+            callback(false)
+        }
+    }
+
+    fun fetchMessages(chatId: String, onMessagesFetched: (List<MessageModel>) -> Unit) {
+        chatsCollection.document(chatId)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING) // Lấy tin nhắn theo thứ tự thời gian
+            .addSnapshotListener { querySnapshot, error ->
+                if (error != null) {
+                    Log.e("Chat", "Lỗi khi lấy tin nhắn: ${error.message}")
+                    return@addSnapshotListener
+                }
+
+                val messages =
+                    querySnapshot?.documents?.mapNotNull { it.toObject(MessageModel::class.java) }
+                messages?.let { onMessagesFetched(it) }
+            }
+    }
+
+    fun getChatIdForOneToOneChat(user1: String, user2: String, callback: (String?) -> Unit) {
+        val chatParticipants = listOf(user1, user2).sorted() // Đảm bảo thứ tự
+        chatsCollection
+            .whereEqualTo("participants", chatParticipants) // Tìm chat giữa 2 người
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                if (!querySnapshot.isEmpty) {
+                    val chatId = querySnapshot.documents.first().id
+                    callback(chatId)
+                } else {
+                    callback(null) // Chưa có cuộc trò chuyện
+                }
+            }
+            .addOnFailureListener {
+                callback(null)
+            }
+    }
+
+
 
     private fun uiHiShowMicAndImage() {
         binding.edtSoanNhanTin.addTextChangedListener(object : TextWatcher {
