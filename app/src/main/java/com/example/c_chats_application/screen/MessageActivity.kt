@@ -19,6 +19,15 @@ import com.example.c_chats_application.model.MessageModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okio.IOException
+import org.json.JSONObject
 
 class MessageActivity : AppCompatActivity() {
 
@@ -156,6 +165,8 @@ class MessageActivity : AppCompatActivity() {
                                 ?.get("unreadMessages.$receiverId") as? Int ?: 0) + 1
                         )
                     )
+                    // Gửi thông báo cho người nhận
+                    sendNotification(receiverId, messageText, chatId)
                     callback(true)
                 }
                 .addOnFailureListener {
@@ -199,6 +210,54 @@ class MessageActivity : AppCompatActivity() {
                 callback(null)
             }
     }
+
+    fun sendNotification(receiverId: String, messageText: String, chatId: String) {
+        val usersCollection = FirebaseFirestore.getInstance().collection("user")
+
+        // Lấy FCM token của người nhận
+        usersCollection.document(receiverId).get()
+            .addOnSuccessListener { document ->
+                val token = document.getString("fcmToken")
+                if (token != null) {
+                    val json = JSONObject()
+                    val notification = JSONObject()
+                    val data = JSONObject()
+
+                    notification.put("title", "Tin nhắn mới")
+                    notification.put("body", messageText)
+
+                    data.put("chatId", chatId)
+
+                    json.put("message", JSONObject().apply {
+                        put("token", token)
+                        put("notification", notification)
+                        put("data", data)
+                    })
+
+                    val client = OkHttpClient()
+                    val requestBody = json.toString()
+                        .toRequestBody("application/json; charset=utf-8".toMediaType())
+                    val request = Request.Builder()
+                        .url("https://fcm.googleapis.com/v1/projects/project-app-65c58/messages:send")
+                        .post(requestBody)
+                        .header("Authorization", "Bearer ${COMMON.accessToken}") // Thay thế với Bearer token
+                        .header("Content-Type", "application/json")
+                        .build()
+
+                    client.newCall(request).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            Log.e("FCM", "Lỗi khi gửi thông báo", e)
+                        }
+
+                        override fun onResponse(call: Call, response: Response) {
+                            Log.d("FCM", "Gửi thông báo thành công: ${response.body?.string()}")
+                        }
+                    })
+                }
+            }
+    }
+
+
 
 
 

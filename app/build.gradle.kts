@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.firebase.database.ktx)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.firebase.messaging.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -86,8 +87,12 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.3.0")
 
     implementation ("com.github.bumptech.glide:glide:4.16.0")
+    // define a BOM and its version
+    implementation(platform("com.squareup.okhttp3:okhttp-bom:4.12.0"))
 
-
+    // define any required OkHttp artifacts without version
+    implementation("com.squareup.okhttp3:okhttp")
+    implementation("com.squareup.okhttp3:logging-interceptor")
 
 
 }
