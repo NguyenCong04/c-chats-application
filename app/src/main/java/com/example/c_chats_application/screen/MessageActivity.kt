@@ -218,42 +218,82 @@ class MessageActivity : AppCompatActivity() {
         usersCollection.document(receiverId).get()
             .addOnSuccessListener { document ->
                 val token = document.getString("fcmToken")
-                if (token != null) {
-                    val json = JSONObject()
-                    val notification = JSONObject()
-                    val data = JSONObject()
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url("https://server-access-token.onrender.com/access-token")
+                    .get()
+                    .header("Content-Type", "application/json")
+                    .build()
+                client.newCall(request).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        Log.e("FCM", "Lỗi khi gửi thông báo", e)
+                    }
 
-                    notification.put("title", "Tin nhắn mới")
-                    notification.put("body", messageText)
+                    override fun onResponse(call: Call, response: Response) {
+                        Log.d("FCM", "Gửi thông báo thành công: ${response.body.toString()}")
+                        response.use {
+                            if (!response.isSuccessful) {
+                                Log.e("FCM", "Lỗi HTTP: ${response.code}")
+                                return
+                            }
 
-                    data.put("chatId", chatId)
+                            val responseBody =
+                                response.body?.string() ?: "{}"  // Nếu body null, dùng "{}"
+                            try {
+                                val jsonObject =
+                                    JSONObject(responseBody)  // Chuyển response thành JSON
+                                val accessToken =
+                                    jsonObject.getString("accessToken") // Lấy accessToken
+                                Log.d("FCM", "Access Token: $accessToken")
+                                if (token != null) {
+                                    val json = JSONObject()
+                                    val notification = JSONObject()
+                                    val data = JSONObject()
 
-                    json.put("message", JSONObject().apply {
-                        put("token", token)
-                        put("notification", notification)
-                        put("data", data)
-                    })
+                                    notification.put("title", "Tin nhắn mới")
+                                    notification.put("body", messageText)
 
-                    val client = OkHttpClient()
-                    val requestBody = json.toString()
-                        .toRequestBody("application/json; charset=utf-8".toMediaType())
-                    val request = Request.Builder()
-                        .url("https://fcm.googleapis.com/v1/projects/project-app-65c58/messages:send")
-                        .post(requestBody)
-                        .header("Authorization", "Bearer ${COMMON.accessToken}") // Thay thế với Bearer token
-                        .header("Content-Type", "application/json")
-                        .build()
+                                    data.put("chatId", chatId)
 
-                    client.newCall(request).enqueue(object : Callback {
-                        override fun onFailure(call: Call, e: IOException) {
-                            Log.e("FCM", "Lỗi khi gửi thông báo", e)
+                                    json.put("message", JSONObject().apply {
+                                        put("token", token)
+                                        put("notification", notification)
+                                        put("data", data)
+                                    })
+                                    val requestBody = json.toString()
+                                        .toRequestBody("application/json; charset=utf-8".toMediaType())
+                                    val requestFCM = Request.Builder()
+                                        .url("https://fcm.googleapis.com/v1/projects/project-app-65c58/messages:send")
+                                        .post(requestBody)
+                                        .header(
+                                            "Authorization",
+                                            "Bearer $accessToken"
+                                        ) // Thay thế với Bearer token
+                                        .header("Content-Type", "application/json")
+                                        .build()
+
+                                    client.newCall(requestFCM).enqueue(object : Callback {
+                                        override fun onFailure(call: Call, e: IOException) {
+                                            Log.e("FCM", "Lỗi khi gửi thông báo", e)
+                                        }
+
+                                        override fun onResponse(call: Call, response: Response) {
+                                            Log.d(
+                                                "FCM",
+                                                "Gửi thông báo thành công: ${response.body?.string()}"
+                                            )
+                                        }
+                                    })
+                                } else {
+                                    Log.e(TAG, "onResponse: error")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("FCM", "Lỗi parse JSON", e)
+                            }
                         }
 
-                        override fun onResponse(call: Call, response: Response) {
-                            Log.d("FCM", "Gửi thông báo thành công: ${response.body?.string()}")
-                        }
-                    })
-                }
+                    }
+                })
             }
     }
 
