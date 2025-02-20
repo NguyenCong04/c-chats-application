@@ -1,24 +1,17 @@
-package com.example.c_chats_application.screen
+package com.example.c_chats_application.service
 
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.util.Log
-import android.view.View
-import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
+import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 import com.example.c_chats_application.R
-import com.example.c_chats_application.adapter.MessageAdapter
-import com.example.c_chats_application.config.COMMON
-import com.example.c_chats_application.databinding.LayoutTextingMessageBinding
 import com.example.c_chats_application.model.ChatModel
 import com.example.c_chats_application.model.MessageModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -26,91 +19,45 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okio.IOException
 import org.json.JSONObject
+import java.io.IOException
 
-class MessageActivity : AppCompatActivity() {
-
-    private val TAG = "ZZMessageActivityZZ"
-    private lateinit var binding: LayoutTextingMessageBinding
+class ReplyReceiver : BroadcastReceiver() {
+    private val TAG = "ZZReplyReceiverZZ"
     private val db = FirebaseFirestore.getInstance()
     private val chatsCollection = db.collection("chats")
     private val auth = FirebaseAuth.getInstance()
+    override fun onReceive(context: Context?, intent: Intent?) {
+        val remoteInput = intent?.let { RemoteInput.getResultsFromIntent(it) }
+        if (remoteInput != null) {
+            val replyText = remoteInput.getCharSequence("key_text_reply").toString()
+            Log.d("ReplyReceiver", "Người dùng đã trả lời: $replyText")
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        binding = LayoutTextingMessageBinding.inflate(layoutInflater)
-
-        //back
-        binding.btnBack.setOnClickListener {
-            onBackPressedDispatcher.onBackPressed()
-            finish()
-        }
-
-        //get Intent
-        val idUserStatus = intent.getStringExtra("idUserStatus") ?: ""
-        val idUserCurrent = auth.currentUser?.uid ?: ""
-
-        uiHiShowMicAndImage()
-        fetchUser(idUserStatus)
-
-        binding.layoutBtnSend.setOnClickListener {
-            val text = binding.edtSoanNhanTin.text.toString().trim()
-            sendTextMessage(idUserCurrent, idUserStatus, text) {
+            // 🔥 Gửi tin nhắn đến server hoặc Firebase ở đây
+            val idUserStatus = intent.getStringExtra("idUserStatus") ?: ""
+            Log.e(TAG, "onReceive: $idUserStatus")
+            val userIdCurrent = auth.currentUser?.uid ?: ""
+            sendTextMessage(userIdCurrent, idUserStatus, replyText) {
                 if (it) {
-                    Log.e(TAG, "onCreate: send successfully $idUserStatus")
-                    binding.edtSoanNhanTin.text.clear()
-                } else {
-                    Log.e(TAG, "onCreate: send failed $idUserStatus")
-                    binding.edtSoanNhanTin.text.clear()
+                    Log.e(TAG, "onReceive: send thanh cong")
+                }else{
+                    Log.e(TAG, "onReceive: send error")
                 }
             }
-        }
-        getChatIdForOneToOneChat(idUserCurrent, idUserStatus) { chatId ->
-            if (chatId != null) {
-                fetchMessages(chatId) { messages ->
-                    val adapter = MessageAdapter(messages, idUserCurrent)
-                    binding.rcvChat.layoutManager = LinearLayoutManager(this).apply {
-                        stackFromEnd = true // Tự động cuộn xuống cuối danh sách
-                    }
-                    binding.rcvChat.adapter = adapter
-                }
-            } else {
-                Log.d("Chat", "Chưa có cuộc trò chuyện giữa hai người này.")
-            }
-        }
+            // Cập nhật thông báo để ẩn ô nhập sau khi trả lời xong
+            val notificationManager =
+                context?.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notification = NotificationCompat.Builder(context, "chat_notifications")
+                .setSmallIcon(R.drawable.icon_avata_default)
+                .setContentText("Bạn đã trả lời: $replyText")
+                .build()
 
-        setContentView(binding.root)
+            notificationManager.notify(0, notification)
+        }else{
+            Log.e(TAG, "onReceive: kkkkk" )
+        }
     }
 
-    private fun fetchUser(idUserStatus: String?) {
-        if (idUserStatus != null) {
-            db.collection("user").document(idUserStatus)
-                .addSnapshotListener { value, error ->
-                    if (error != null) return@addSnapshotListener
-
-                    if (value != null) {
-                        val name = value.getString("name").toString()
-                        val image = value.getString("image").toString()
-                        val status = value.getString("status").toString()
-                        if (!isDestroyed) {
-                            Glide.with(this)
-                                .load(image)
-                                .placeholder(R.drawable.icon_avata_default)
-                                .into(binding.ivAvatarItemTinNhan)
-                        }
-                        binding.tvNameUser.text = name
-                        binding.tvStatusUser.text = status
-                        val backgroundDrawable =
-                            binding.vTrangThaiUser.background as GradientDrawable
-                        backgroundDrawable.setColor(if (status == COMMON.statusOnline) Color.GREEN else Color.GRAY)
-                    }
-
-                }
-        }
-
-    }
     private fun sendTextMessage(
         senderId: String,
         receiverId: String,
@@ -166,7 +113,7 @@ class MessageActivity : AppCompatActivity() {
                         )
                     )
                     // Gửi thông báo cho người nhận
-                    sendNotification(receiverId, messageText, chatId,senderId)
+                    sendNotification(receiverId, messageText, chatId, senderId)
                     callback(true)
                 }
                 .addOnFailureListener {
@@ -177,41 +124,12 @@ class MessageActivity : AppCompatActivity() {
         }
     }
 
-    fun fetchMessages(chatId: String, onMessagesFetched: (List<MessageModel>) -> Unit) {
-        chatsCollection.document(chatId)
-            .collection("messages")
-            .orderBy("timestamp", Query.Direction.ASCENDING) // Lấy tin nhắn theo thứ tự thời gian
-            .addSnapshotListener { querySnapshot, error ->
-                if (error != null) {
-                    Log.e("Chat", "Lỗi khi lấy tin nhắn: ${error.message}")
-                    return@addSnapshotListener
-                }
-
-                val messages =
-                    querySnapshot?.documents?.mapNotNull { it.toObject(MessageModel::class.java) }
-                messages?.let { onMessagesFetched(it) }
-            }
-    }
-
-    fun getChatIdForOneToOneChat(user1: String, user2: String, callback: (String?) -> Unit) {
-        val chatParticipants = listOf(user1, user2).sorted() // Đảm bảo thứ tự
-        chatsCollection
-            .whereEqualTo("participants", chatParticipants) // Tìm chat giữa 2 người
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                if (!querySnapshot.isEmpty) {
-                    val chatId = querySnapshot.documents.first().id
-                    callback(chatId)
-                } else {
-                    callback(null) // Chưa có cuộc trò chuyện
-                }
-            }
-            .addOnFailureListener {
-                callback(null)
-            }
-    }
-
-    fun sendNotification(receiverId: String, messageText: String, chatId: String, senderId: String) {
+    fun sendNotification(
+        receiverId: String,
+        messageText: String,
+        chatId: String,
+        senderId: String
+    ) {
         val usersCollection = FirebaseFirestore.getInstance().collection("user")
 
         // Lấy FCM token của người nhận
@@ -253,7 +171,7 @@ class MessageActivity : AppCompatActivity() {
                                     notification.put("title", "Tin nhắn mới")
                                     notification.put("body", messageText)
 
-                                    data.put("senderId",senderId)
+                                    data.put("senderId", senderId)
                                     data.put("chatId", chatId)
 
                                     json.put("message", JSONObject().apply {
@@ -298,23 +216,5 @@ class MessageActivity : AppCompatActivity() {
             }
     }
 
-    private fun uiHiShowMicAndImage() {
-        binding.edtSoanNhanTin.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
-
-            override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-                if (p0.toString() == "") {
-                    binding.layoutMicAndImage.visibility = View.VISIBLE
-                    binding.layoutBtnSend.visibility = View.GONE
-                } else {
-                    binding.layoutMicAndImage.visibility = View.GONE
-                    binding.layoutBtnSend.visibility = View.VISIBLE
-                }
-            }
-
-            override fun afterTextChanged(p0: Editable?) {}
-        })
-
-    }
 
 }
